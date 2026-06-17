@@ -1,0 +1,6 @@
+Musik/
+goid3db
+goid3db.sqlite
+goid3db.sqlite-journal
+*.log
+*.tmp
