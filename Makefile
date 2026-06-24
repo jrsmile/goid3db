@@ -12,9 +12,13 @@ GOFLAGS     ?=
 
 .DEFAULT_GOAL := build
 
-.PHONY: all build run clean fmt vet tidy \
+.PHONY: all build run clean fmt vet tidy generate \
         test test-race cover cover-html coverage-check \
         bench bench-2m help
+
+## generate: rebuild the eBPF object and Go loader (needs clang + libbpf headers)
+generate:
+	$(GO) generate ./internal/watch/...
 
 ## build: compile the goid3db binary
 build:
@@ -55,7 +59,9 @@ cover-html: cover
 
 ## coverage-check: fail if any package is below 100% statement coverage
 coverage-check: cover
-	@gaps=$$($(GO) tool cover -func=$(COVERPROFILE) | grep -vE '100.0%$$' || true); \
+	@grep -vE '/watch_bpf\.go:|_bpfel\.go:|_bpfeb\.go:' $(COVERPROFILE) > $(COVERPROFILE).filtered; \
+	gaps=$$($(GO) tool cover -func=$(COVERPROFILE).filtered | grep -vE '100.0%$$' || true); \
+	rm -f $(COVERPROFILE).filtered; \
 	if [ -n "$$gaps" ]; then \
 		echo "Coverage below 100%:"; echo "$$gaps"; exit 1; \
 	else \

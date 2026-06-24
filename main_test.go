@@ -137,7 +137,12 @@ func TestRunWatchAndDevicesWarn(t *testing.T) {
 	loadAllTracks = func(*index.Index, context.Context) ([]model.Track, error) { return nil, nil }
 	listDevices = func(*audio.Engine) ([]audio.Device, error) { return nil, errors.New("no devices") }
 	runProgram = func(tea.Model) error { return nil }
-	// doWatch=true with a real, existing root succeeds and starts handleEvents.
+	// doWatch=true with a watcher that starts successfully exercises the
+	// handleEvents branch.
+	events := make(chan watch.Event)
+	startWatch = func(context.Context, string, time.Duration) (<-chan watch.Event, error) {
+		return events, nil
+	}
 	if err := run(t.TempDir(), tempDB(t), 1, true); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}

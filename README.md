@@ -16,9 +16,9 @@ to a selectable output device (default soundcard **or** a Bluetooth sink).
   raw ID3 tags, fuzzily and in parallel across CPU cores.
 - **Permanent index**: a single SQLite database with an FTS5 trigram table; only
   new/changed files are re-parsed on startup.
-- **Instant updates**: a native recursive filesystem watcher reflects added,
-  changed and removed files into both the database and the live UI without a
-  restart.
+- **Instant updates**: an eBPF-based filesystem watcher (with an inotify
+  fallback) reflects added, changed and removed files into both the database and
+  the live UI without a restart.
 - **Device routing**: enumerate playback devices and send audio to the default
   soundcard or any connected Bluetooth speaker.
 - **Album art**: embedded cover art rendered inline in the terminal.
@@ -72,7 +72,7 @@ of large structs, which is what keeps it interactive at 2M tracks.
 | `internal/scan` | Concurrent filesystem walk and audio-metadata parsing. |
 | `internal/index` | Permanent SQLite index with an FTS5 trigram table. |
 | `internal/search` | In-memory, sharded, fzf-style fuzzy matcher (SoA hot index). |
-| `internal/watch` | Recursive filesystem watcher with debounced events. |
+| `internal/watch` | eBPF (cilium/ebpf) watcher with an inotify fallback, debounced events. |
 | `internal/audio` | Decoding (beep) and device-pinned playback (miniaudio/malgo). |
 | `internal/art` | Embedded album-art extraction and terminal half-block rendering. |
 | `internal/tui` | Bubble Tea terminal UI: type-to-filter list, playback, devices. |
@@ -84,6 +84,12 @@ of large structs, which is what keeps it interactive at 2M tracks.
 - Go **1.25+**
 - A C toolchain (`gcc`/`clang`) — `CGO_ENABLED=1` is required for the miniaudio
   audio backend.
+- **Linux** for the live watcher. When run as root it uses an eBPF watcher
+  (loading the programs needs root, or `CAP_BPF`+`CAP_PERFMON`); otherwise, or if
+  the eBPF programs cannot be loaded, it transparently falls back to a recursive
+  inotify watcher. Rebuilding the eBPF object (`make generate`) additionally
+  needs `clang` and the libbpf headers, but the generated object is committed so
+  a plain `go build` does not.
 
 ## Install / Build
 
