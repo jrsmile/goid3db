@@ -1,0 +1,70 @@
+name: Release
+
+# Build, test and publish a new release on every push to main.
+on:
+  push:
+    branches: [main]
+
+# Needed to create tags and GitHub Releases.
+permissions:
+  contents: write
+
+# Never run two releases for main at the same time.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install arm64 cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Test
+        run: make test
+
+      - name: Compute next semver tag
+        id: tag
+        run: |
+          latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$latest" ]; then
+            next="v0.1.0"
+          else
+            ver=${latest#v}
+            IFS=. read -r major minor patch <<< "$ver"
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "Next release tag: $next (previous: ${latest:-none})"
+          echo "value=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=gcc \
+            go build -o goid3db-linux-amd64 .
+          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc \
+            go build -o goid3db-linux-arm64 .
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: ${{ steps.tag.outputs.value }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: |
+            goid3db-linux-amd64
+            goid3db-linux-arm64
